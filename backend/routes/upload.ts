@@ -13,39 +13,30 @@ export async function uploadRoutes(fastify: FastifyInstance): Promise<void> {
       const part = await request.file();
 
       if (!part) {
-        return reply.code(400).send({
-          success: false,
-          error: 'Missing file field in multipart form-data.',
-        });
+        return reply.code(400).send({ error: 'Missing file field in multipart form-data.' });
       }
 
       await fs.mkdir(UPLOADS_DIR, { recursive: true });
 
       const filename = buildUniqueFilename(part.filename ?? 'video.mp4');
       const destination = path.join(UPLOADS_DIR, filename);
-      const job = createJob({ status: 'queued', progress: 0 });
+      const job = createJob({ status: 'uploading' });
 
       await pipeline(part.file, createWriteStream(destination));
 
-      const updated = updateJob(job.id, {
+      updateJob(job.id, {
         uploadPath: destination,
         progress: 10,
       });
 
-      return reply.code(200).send({
-        success: true,
-        data: {
-          jobId: job.id,
-          status: updated?.status ?? 'queued',
-          progress: updated?.progress ?? 10,
-        },
+      return reply.code(201).send({
+        jobId: job.id,
+        status: 'uploading',
+        uploadPath: destination,
       });
     } catch (error) {
       request.log.error({ error }, 'Upload failed');
-      return reply.code(500).send({
-        success: false,
-        error: 'Unable to upload video file.',
-      });
+      return reply.code(500).send({ error: 'Unable to upload video file.' });
     }
   });
 }

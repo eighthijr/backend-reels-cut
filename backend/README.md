@@ -1,6 +1,6 @@
 # Video Processing Backend (Fastify)
 
-A Node.js + Fastify backend API that accepts video uploads and asynchronously processes them with an in-memory job queue.
+A Node.js + Fastify backend API that accepts video uploads and asynchronously processes them with a job queue in memory.
 
 ## Run
 
@@ -20,25 +20,9 @@ npm run start
 
 - `POST /upload` - upload a video file to `storage/uploads`
 - `POST /process` - enqueue processing for an uploaded `jobId`
-- `GET /status/:jobId` - check job status/progress
-- `GET /result/:jobId` - read clip/subtitle URLs when complete
+- `GET /status/:jobId` - check progress/status
+- `GET /result/:jobId` - read clip/subtitle output when complete
 - `GET /health` - health check
-
-## Job lifecycle
-
-`queued -> processing -> completed | failed`
-
-## Response shape
-
-All endpoints return JSON:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "error": "optional error"
-}
-```
 
 ## Example `curl` upload
 
@@ -48,21 +32,31 @@ curl -X POST http://localhost:3000/upload \
   -F "file=@/absolute/path/to/video.mp4"
 ```
 
+Expected response:
+
+```json
+{
+  "jobId": "9f5df4cd-6cf8-4bc6-a50f-c68777ba24e6",
+  "status": "uploading",
+  "uploadPath": "/workspace/backend-reels-cut/backend/storage/uploads/video-...mp4"
+}
+```
+
 Then enqueue processing:
 
 ```bash
 curl -X POST http://localhost:3000/process \
   -H "Content-Type: application/json" \
-  -d '{"jobId":"<job-id-from-upload>"}'
+  -d '{"jobId":"9f5df4cd-6cf8-4bc6-a50f-c68777ba24e6"}'
 ```
 
 And poll:
 
 ```bash
-curl http://localhost:3000/status/<job-id>
-curl http://localhost:3000/result/<job-id>
+curl http://localhost:3000/status/9f5df4cd-6cf8-4bc6-a50f-c68777ba24e6
+curl http://localhost:3000/result/9f5df4cd-6cf8-4bc6-a50f-c68777ba24e6
 ```
 
 ## Postman tip
 
-For `POST /upload`, choose `Body -> form-data`, add key `file` with type `File`, and select your video file.
+In Postman, create a `POST /upload` request, choose `Body -> form-data`, add key `file` with type `File`, and select your video file.

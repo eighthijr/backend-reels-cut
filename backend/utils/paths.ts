@@ -8,7 +8,3 @@ export const ROOT_DIR = path.resolve(__dirname, '..');
 export const STORAGE_DIR = path.join(ROOT_DIR, 'storage');
 export const UPLOADS_DIR = path.join(STORAGE_DIR, 'uploads');
 export const OUTPUTS_DIR = path.join(STORAGE_DIR, 'outputs');
-
-export function toOutputUrl(jobId: string, filename: string): string {
-  return path.posix.join('/outputs', jobId, filename);
-}

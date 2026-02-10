@@ -1,8 +1,6 @@
-import path from 'node:path';
 import { getJob, updateJob } from '../jobs/jobStore.js';
 import { renderFinalAssets, splitIntoClips } from './ffmpeg.js';
 import { transcribeVideo } from './whisper.js';
-import { toOutputUrl } from '../utils/paths.js';
 
 const processingJobs = new Set<string>();
 
@@ -17,49 +15,36 @@ export function enqueueJobProcessing(jobId: string): void {
   }
 
   processingJobs.add(jobId);
-  updateJob(jobId, { status: 'queued', progress: Math.max(job.progress, 10), error: undefined });
 
-  // keep processing asynchronous so the main server remains responsive
-  setImmediate(() => {
-    void processJob(jobId).finally(() => {
-      processingJobs.delete(jobId);
-    });
+  void processJob(jobId).finally(() => {
+    processingJobs.delete(jobId);
   });
 }
 
 async function processJob(jobId: string): Promise<void> {
   try {
-    updateJob(jobId, { status: 'processing', progress: 20, error: undefined });
+    updateJob(jobId, { status: 'transcribing', progress: 25, error: undefined });
+    const subtitlesPath = await transcribeVideo(jobId);
 
-    const subtitleResult = await transcribeVideo(jobId);
-    updateJob(jobId, { status: 'processing', progress: 50 });
+    updateJob(jobId, { status: 'splitting', progress: 60 });
+    const clips = await splitIntoClips(jobId);
 
-    const clipPaths = await splitIntoClips(jobId);
-    updateJob(jobId, { status: 'processing', progress: 80 });
-
+    updateJob(jobId, { status: 'rendering', progress: 85 });
     await renderFinalAssets(jobId);
 
-    const clips = clipPaths.map((clipPath) => toOutputUrl(jobId, path.basename(clipPath)));
-    const subtitlesPath = toOutputUrl(jobId, path.basename(subtitleResult.srtPath));
-    const subtitlesVttPath = subtitleResult.vttPath
-      ? toOutputUrl(jobId, path.basename(subtitleResult.vttPath))
-      : undefined;
-
     updateJob(jobId, {
-      status: 'completed',
+      status: 'done',
       progress: 100,
       result: {
         clips,
         subtitlesPath,
-        subtitlesVttPath,
       },
-      error: undefined,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Video processing failed.';
+    const message = error instanceof Error ? error.message : 'Unknown processing error';
     updateJob(jobId, {
-      status: 'failed',
-      error: `Processing pipeline failed: ${message}`,
+      status: 'error',
+      error: message,
     });
   }
 }
